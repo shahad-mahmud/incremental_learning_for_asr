@@ -1,3 +1,13 @@
+# data related
+data_dir: ../data
+audio_extensions:
+  - .flac
+
+train_annotation: ../json/train.json
+valid_annotation: ../json/valid.json
+test_annotation: ../json/test.json
+
+# run options related
 batch_size: 5
 
 encoder:
