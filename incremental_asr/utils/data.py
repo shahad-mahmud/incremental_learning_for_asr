@@ -30,10 +30,10 @@ def prepare_annotation_files(configs: dict) -> None:
         logging.warn("Annotation files already exist. Skipping preparation.")
         return
 
-    audio_file_paths = get_files_with_extensions(
-        configs['data_dir'], configs['audio_extensions'])
-    transcript_file_path = get_files_with_extensions(
-        configs['data_dir'], '.tsv')
+    audio_file_paths = get_files_with_extensions(configs['data_dir'],
+                                                 configs['audio_extensions'])
+    transcript_file_path = get_files_with_extensions(configs['data_dir'],
+                                                     '.tsv')
 
     transcripts = get_transcription(transcript_file_path)
     train_paths, valid_paths, test_paths = get_sets(audio_file_paths)
@@ -43,7 +43,20 @@ def prepare_annotation_files(configs: dict) -> None:
     create_json(test_paths, transcripts, configs['test_annotation'])
 
 
-def create_json(audio_paths, trans_dict, json_file_path, streaming_dataset=False, streaming_duration_limit=10):
+def create_json(audio_paths: List[str],
+                trans_dict: dict,
+                json_file_path: str,
+                streaming_dataset: bool = False,
+                streaming_duration_limit: int = 10):
+    """Create JSON files for a dataset
+
+    Args:
+        audio_paths (List[str]): Audio paths of the dataset
+        trans_dict (dict): Transcription dictionary where the key if the audio ID
+        json_file_path (str): JSON file path to dump the dir
+        streaming_dataset (bool, optional): Is the dataset for streaming ASR. Defaults to False.
+        streaming_duration_limit (int, optional): Maximum duration of audio to allow. Defaults to 10.
+    """
     transcription_dict = {}
     for audio_path in tqdm(audio_paths, desc=f"Creating {json_file_path}"):
         try:
@@ -70,7 +83,7 @@ def create_json(audio_paths, trans_dict, json_file_path, streaming_dataset=False
     dir_path = os.path.dirname(json_file_path)
     if not os.path.exists(dir_path):
         os.makedirs(dir_path)
-    
+
     with open(json_file_path, mode="w+") as f:
         json.dump(transcription_dict, f, indent=2)
 
@@ -78,14 +91,23 @@ def create_json(audio_paths, trans_dict, json_file_path, streaming_dataset=False
 
 
 def get_sets(paths: list):
-    train_set = paths[:int(0.8*len(paths))]
-    valid_set = paths[int(0.8*len(paths)):int(0.8*len(paths))+int(0.1*len(paths))]
-    test_set = paths[int(0.8*len(paths))+int(0.1*len(paths)):]
+    train_set = paths[:int(0.8 * len(paths))]
+    valid_set = paths[int(0.8 * len(paths)):int(0.8 * len(paths)) +
+                      int(0.1 * len(paths))]
+    test_set = paths[int(0.8 * len(paths)) + int(0.1 * len(paths)):]
 
     return train_set, valid_set, test_set
 
 
-def get_transcription(trans_file_list):
+def get_transcription(trans_file_list: List[str]) -> dict:
+    """Read a TSV file and create transcription dictionary
+
+    Args:
+        trans_file_list (List[str]): Path of the transcription file
+
+    Returns:
+        dict: Transcription dictionary
+    """
     trans_dict = {}
     for trans_file in trans_file_list:
         logging.info(f"Getting transcript from file: {trans_file}")
