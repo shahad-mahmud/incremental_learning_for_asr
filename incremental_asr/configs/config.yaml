@@ -3,13 +3,9 @@ data_dir: ../data
 audio_extensions:
   - .flac
 
-train_annotation: ../json/train.json
-valid_annotation: ../json/valid.json
-test_annotation: ../json/test.json
+train_annotation: ../jsons/train.json
+valid_annotation: ../jsons/valid.json
+test_annotation: ../jsons/test.json
 
 # run options related
 batch_size: 5
-
-encoder:
-  start: 90
-  end: auto
