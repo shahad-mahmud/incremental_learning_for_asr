@@ -1,0 +1,5 @@
+batch_size: 5
+
+encoder:
+  start: 90
+  end: auto
