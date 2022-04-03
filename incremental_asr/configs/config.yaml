@@ -1,3 +1,7 @@
+# basic configs
+run_num: 0
+result_dir: '../results/asr/'
+
 # data related
 data_dir: ../data
 audio_extensions:
@@ -10,7 +14,12 @@ test_annotation: ../jsons/test.json
 skip_data_preparation: false
 
 # run options related
-batch_size: 5
+train_batch_size: 2
+valid_batch_size: 2
+test_batch_size: 2
 
+shuffle: false
 # tokenizer related
-tokenizer_path: ../results/tokenizer/run_0/bpe_100.model
+tokenizer_path: ../results/tokenizer/run_0/bpe_1000.model
+
+# feature related

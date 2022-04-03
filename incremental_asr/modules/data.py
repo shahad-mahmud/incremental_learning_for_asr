@@ -1,6 +1,7 @@
 import json
 import torch
 import torchaudio
+import sentencepiece
 
 
 class SpeechDataset(torch.utils.data.Dataset):
@@ -23,9 +24,33 @@ class SpeechDataset(torch.utils.data.Dataset):
         signal, _ = torchaudio.load(self.annotation_dict[index]['audio_path'])
         transcription = self.annotation_dict[index]['transcription']
 
-        item = {
-            'id': audio_id,
-            'signal': signal,
-            'transcription': transcription
-        }
-        return item
+        return audio_id, signal, transcription
+
+
+class SpeechDataLoader(torch.utils.data.DataLoader):
+    def __init__(self, data_set_type: str, configs: dict,
+                tokenizer: sentencepiece.SentencePieceProcessor) -> None:
+        dataset = SpeechDataset(configs[f'{data_set_type}_annotation'])
+        batch_size = configs[f'{data_set_type}_batch_size']
+        super().__init__(dataset,
+                        batch_size=batch_size,
+                        shuffle=configs['shuffle'],
+                        collate_fn=self.collate_function_padded,
+                        drop_last=True)
+
+        self.tokenizer = tokenizer
+
+    def collate_function_padded(self, batch):
+        ids, signals, transcriptions, tokens = [], [], [], []
+
+        for id, signal, transcription in batch:
+            ids.append(id)
+            signals.append(signal.squeeze())
+            transcriptions.append(transcription)
+            tokens.append(
+                torch.tensor(self.tokenizer.encode_as_ids(transcription)))
+
+        signals = torch.nn.utils.rnn.pad_sequence(signals, batch_first=True)
+        tokens = torch.nn.utils.rnn.pad_sequence(tokens, batch_first=True)
+
+        return ids, signals, transcriptions, tokens

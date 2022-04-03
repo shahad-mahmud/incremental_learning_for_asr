@@ -1,22 +1,26 @@
+import os
 import utils
 import torch
 import modules
+import sentencepiece
 
 if __name__ == "__main__":
     configs = utils.parsing.parse_args_and_configs()
-    
+
     if not configs['skip_data_preparation']:
         utils.data.prepare_annotation_files(configs)
-    
-    train_set = modules.data.SpeechDataset(configs['train_annotation'])
-    train_loader = torch.utils.data.DataLoader(train_set, batch_size=configs['batch_size'], shuffle=True)
-    
-    test_set = modules.data.SpeechDataset(configs['test_annotation'])
-    test_loader = torch.utils.data.DataLoader(test_set, batch_size=configs['batch_size'], shuffle=False)
-    
-    valid_set = modules.data.SpeechDataset(configs['valid_annotation'])
-    valid_loader = torch.utils.data.DataLoader(valid_set, batch_size=configs['batch_size'], shuffle=False)
-    
-    
-    
-    
+
+    if not os.path.exists(configs['result_dir']):
+        os.makedirs(configs['result_dir'], exist_ok=True)
+
+    tokenizer = sentencepiece.SentencePieceProcessor(
+        model_file=configs['tokenizer_path'])
+
+    train_loader = modules.data.SpeechDataLoader('train', configs, tokenizer)
+    valid_loader = modules.data.SpeechDataLoader('valid', configs, tokenizer)
+    test_loader = modules.data.SpeechDataLoader('test', configs, tokenizer)
+
+    model = modules.model.ASR(configs)
+
+    for batch in train_loader:
+        model(batch)
