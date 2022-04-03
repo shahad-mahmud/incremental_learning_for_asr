@@ -7,5 +7,7 @@ train_annotation: ../jsons/train.json
 valid_annotation: ../jsons/valid.json
 test_annotation: ../jsons/test.json
 
+skip_data_preparation: false
+
 # run options related
 batch_size: 5
