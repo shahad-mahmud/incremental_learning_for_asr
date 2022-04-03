@@ -11,12 +11,12 @@ if __name__ == "__main__":
     train_set = modules.data.SpeechDataset(configs['train_annotation'])
     train_loader = torch.utils.data.DataLoader(train_set, batch_size=configs['batch_size'], shuffle=True)
     
-    print(len(train_set))
-    for a in train_set:
-        print(a)
+    test_set = modules.data.SpeechDataset(configs['test_annotation'])
+    test_loader = torch.utils.data.DataLoader(test_set, batch_size=configs['batch_size'], shuffle=False)
     
-    # for batch in train_loader:
-    #     print(batch)
+    valid_set = modules.data.SpeechDataset(configs['valid_annotation'])
+    valid_loader = torch.utils.data.DataLoader(valid_set, batch_size=configs['batch_size'], shuffle=False)
+    
     
     
     

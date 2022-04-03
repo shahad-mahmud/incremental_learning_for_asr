@@ -13,4 +13,4 @@ skip_data_preparation: false
 batch_size: 5
 
 # tokenizer related
-tokenizer: 
+tokenizer_path: ../results/tokenizer/run_0/bpe_100.model

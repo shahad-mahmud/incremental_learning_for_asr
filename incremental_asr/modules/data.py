@@ -22,7 +22,7 @@ class SpeechDataset(torch.utils.data.Dataset):
         audio_id = self.annotation_dict[index]['id']
         signal, _ = torchaudio.load(self.annotation_dict[index]['audio_path'])
         transcription = self.annotation_dict[index]['transcription']
-        
+
         item = {
             'id': audio_id,
             'signal': signal,

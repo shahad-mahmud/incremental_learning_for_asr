@@ -98,12 +98,14 @@ def prepare_text_file(configs: dict) -> None:
     if text_file_exists(configs):
         logging.warn("Text file already exists. Skipping preparation.")
         return
-    
-    transcript_file_path = get_files_with_extensions(configs['data_dir'], '.tsv')
+
+    transcript_file_path = get_files_with_extensions(configs['data_dir'],
+                                                     '.tsv')
     transcripts = get_transcription(transcript_file_path)
-    
+
     create_text_file(configs, transcripts)
-    
+
+
 def create_text_file(configs: dict, transcripts: dict):
     """Create a text file with the transcriptions of the dataset
 
@@ -115,13 +117,13 @@ def create_text_file(configs: dict, transcripts: dict):
     parent = os.path.dirname(configs['text_file'])
     if not os.path.exists(parent):
         os.makedirs(parent, exist_ok=True)
-        
+
     with open(configs['text_file'], mode="w+") as f:
         for _, value in transcripts.items():
             f.write(f"{value.strip()}\n")
 
     logging.info(f"{configs['text_file']} successfully created!")
-    
+
 
 def get_sets(paths: list):
     train_set = paths[:int(0.8 * len(paths))]
@@ -176,6 +178,7 @@ def annotation_files_exist(configs: dict) -> bool:
         return False
 
     return True
+
 
 def text_file_exists(configs: dict) -> bool:
     return os.path.exists(configs['text_file'])
