@@ -41,16 +41,19 @@ class SpeechDataLoader(torch.utils.data.DataLoader):
         self.tokenizer = tokenizer
 
     def collate_function_padded(self, batch):
-        ids, signals, transcriptions, tokens = [], [], [], []
+        ids, signals, transcriptions, batch_tokens = [], [], [], []
 
         for id, signal, transcription in batch:
             ids.append(id)
             signals.append(signal.squeeze())
             transcriptions.append(transcription)
-            tokens.append(
-                torch.tensor(self.tokenizer.encode_as_ids(transcription)))
+
+            tokens = self.tokenizer.encode_as_ids(transcription)
+            tokens.insert(0, self.tokenizer.bos_id())
+            tokens.append(self.tokenizer.eos_id())
+            batch_tokens.append(torch.tensor(tokens))
 
         signals = torch.nn.utils.rnn.pad_sequence(signals, batch_first=True)
-        tokens = torch.nn.utils.rnn.pad_sequence(tokens, batch_first=True)
+        batch_tokens = torch.nn.utils.rnn.pad_sequence(batch_tokens, batch_first=True)
 
-        return ids, signals, transcriptions, tokens
+        return ids, signals, transcriptions, batch_tokens

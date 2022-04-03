@@ -14,12 +14,18 @@ test_annotation: ../jsons/test.json
 skip_data_preparation: false
 
 # run options related
-train_batch_size: 2
-valid_batch_size: 2
-test_batch_size: 2
+train_batch_size: 8
+valid_batch_size: 8
+test_batch_size: 1
 
 shuffle: false
+
 # tokenizer related
 tokenizer_path: ../results/tokenizer/run_0/bpe_1000.model
 
 # feature related
+sample_rate: 16000
+n_fft: 400
+n_mels: 80
+win_length: 400
+hop_length: 200
