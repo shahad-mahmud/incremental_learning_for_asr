@@ -26,6 +26,16 @@ tokenizer_path: ../results/tokenizer/run_0/bpe_1000.model
 # feature related
 sample_rate: 16000
 n_fft: 400
-n_mels: 80
+n_mels: 60
 win_length: 400
 hop_length: 200
+
+# model related
+n_conv: 3
+conv_kernel_size: 10
+conv_stride: 2
+conv_padding: valid
+
+n_sab: 10
+attention_heads: 6
+dense_units: 1000
