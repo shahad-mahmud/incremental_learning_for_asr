@@ -1,6 +1,7 @@
 # dirs
 data
 jsons
+results
 
 __pycache__
 .vscode

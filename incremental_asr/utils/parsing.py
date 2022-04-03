@@ -1,5 +1,8 @@
+from unittest import result
 import yaml
 import argparse
+
+from os.path import join
 
 
 def parse_args_and_configs() -> dict:
@@ -20,6 +23,10 @@ def parse_args_and_configs() -> dict:
         if value is not None:
             configs[key] = value
 
+    if 'run_num' in configs and 'result_dir' in configs:
+        configs['result_dir'] = join(configs['result_dir'], f'run_{configs["run_num"]}')
+    
+    del configs['run_num']
     return configs
 
 

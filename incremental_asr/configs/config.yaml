@@ -11,3 +11,6 @@ skip_data_preparation: false
 
 # run options related
 batch_size: 5
+
+# tokenizer related
+tokenizer: 

@@ -1,0 +1,10 @@
+run_num: 0
+data_dir: ../data
+result_dir: ../results/tokenizer
+
+text_file: ../results/text.txt
+skip_data_preparation: false
+
+vocab_size: 1000
+model_type: bpe  # bpe, unigram, char or word
+character_coverage: 1.0

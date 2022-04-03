@@ -1,4 +1,3 @@
-from genericpath import exists
 import os
 import json
 import regex
@@ -12,16 +11,16 @@ from utils.io import *
 def prepare_annotation_files(configs: dict) -> None:
     """Read the data directory from configurations and create
     annotation files for training, validation and testing. The
-    annotation files are JSON files with the following format:\n
-    {\n
-        ...\n
-        utterance_id: {\n
-            audio_path: path_to_audio_file,\n
-            duration: duration_of_audio_file,\n
-            transcription: transcription_of_audio_file\n
-        }\n
-        ...\n
-    }\n
+    annotation files are JSON files with the following format:
+    {
+        ...
+        utterance_id: {
+            audio_path: path_to_audio_file,
+            duration: duration_of_audio_file,
+            transcription: transcription_of_audio_file
+        }
+        ...
+    }
 
     Args:
         configs (dict): The configurations dictionary.
@@ -90,6 +89,40 @@ def create_json(audio_paths: List[str],
     logging.info(f"{json_file_path} successfully created!")
 
 
+def prepare_text_file(configs: dict) -> None:
+    """Create a text file with the transcriptions of the dataset
+
+    Args:
+        configs (dict): The configurations dictionary.
+    """
+    if text_file_exists(configs):
+        logging.warn("Text file already exists. Skipping preparation.")
+        return
+    
+    transcript_file_path = get_files_with_extensions(configs['data_dir'], '.tsv')
+    transcripts = get_transcription(transcript_file_path)
+    
+    create_text_file(configs, transcripts)
+    
+def create_text_file(configs: dict, transcripts: dict):
+    """Create a text file with the transcriptions of the dataset
+
+    Args:
+        configs (dict): The configurations dictionary.
+        transcripts (dict): Transcription dictionary
+    """
+    # get parents
+    parent = os.path.dirname(configs['text_file'])
+    if not os.path.exists(parent):
+        os.makedirs(parent, exist_ok=True)
+        
+    with open(configs['text_file'], mode="w+") as f:
+        for _, value in transcripts.items():
+            f.write(f"{value.strip()}\n")
+
+    logging.info(f"{configs['text_file']} successfully created!")
+    
+
 def get_sets(paths: list):
     train_set = paths[:int(0.8 * len(paths))]
     valid_set = paths[int(0.8 * len(paths)):int(0.8 * len(paths)) +
@@ -143,3 +176,6 @@ def annotation_files_exist(configs: dict) -> bool:
         return False
 
     return True
+
+def text_file_exists(configs: dict) -> bool:
+    return os.path.exists(configs['text_file'])
