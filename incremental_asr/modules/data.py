@@ -47,13 +47,13 @@ class SpeechDataLoader(torch.utils.data.DataLoader):
         for id, signal, transcription in batch:
             ids.append(id)
             signals.append(signal.squeeze())
-            signal_lengths.append(signal.shape[0])
+            signal_lengths.append(signal.shape[1])
             transcriptions.append(transcription)
-            token_lengths.append(len(transcription) + 2)
 
             tokens = self.tokenizer.encode_as_ids(transcription)
             tokens.insert(0, self.tokenizer.bos_id())
             tokens.append(self.tokenizer.eos_id())
+            token_lengths.append(len(tokens))
             batch_tokens.append(torch.tensor(tokens))
 
         signals = torch.nn.utils.rnn.pad_sequence(signals, batch_first=True)
