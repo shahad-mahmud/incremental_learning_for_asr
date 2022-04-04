@@ -28,8 +28,8 @@ if __name__ == "__main__":
     trainer = pl.Trainer(
         max_epochs=configs['epochs'],
         accelerator='gpu',
-        devices=2,
-        strategy=strategy,
+        devices=[1],
+        # strategy=strategy,
     )
     
     trainer.fit(

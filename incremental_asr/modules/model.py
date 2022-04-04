@@ -1,6 +1,7 @@
 import torch
 import pytorch_lightning as pl
 from . import featurizers
+from . import blocks
 
 
 class ASR(pl.LightningModule):
@@ -55,22 +56,31 @@ class ASRBase(torch.nn.Module):
         self.configs = configs
         self.signal_featurizer = featurizers.LogMelSpectogram(configs)
 
-        self.conv1 = torch.nn.Sequential(
-            torch.nn.Conv1d(
-                in_channels=configs['n_mels'],
-                out_channels=configs['n_mels'],
-                kernel_size=configs['conv_kernel_size'],
-                stride=configs['conv_stride'],
-                padding=configs['conv_padding'],
-            ),
-            torch.nn.LeakyReLU(),
-            torch.nn.Dropout(p=configs['dropout']),
+        self.conv1 = blocks.Conv1dBlock(
+            in_channels=configs['n_mels'],
+            out_channels=configs['n_mels'],
+            kernel_size=configs['conv_kernel_size'],
+            stride=configs['conv_stride'],
+            padding=configs['conv_padding'],
+        )
+        
+        self.conv2 = blocks.Conv1dBlock(
+            in_channels=configs['n_mels'],
+            out_channels=configs['n_mels'],
+            kernel_size=configs['conv_kernel_size'],
+            stride=configs['conv_stride'],
+            padding=configs['conv_padding'],
         )
 
-        self.sab1 = torch.nn.MultiheadAttention(
+        self.sab1 = blocks.AttentionBlock(
             configs['n_mels'],
             configs['attention_heads'],
-            batch_first=True,
+            dropout=configs['dropout'],
+        )
+        self.sab2 = blocks.AttentionBlock(
+            configs['n_mels'],
+            configs['attention_heads'],
+            dropout=configs['dropout'],
         )
 
         self.dense1 = torch.nn.Linear(
@@ -82,6 +92,7 @@ class ASRBase(torch.nn.Module):
             configs['dense_units'],
         )
         self.activation = torch.nn.LeakyReLU()
+        self.norm = torch.nn.LayerNorm(configs['n_mels'])
 
     def forward(self, batch):
         _, signals, _, _, _, _ = batch
@@ -93,10 +104,11 @@ class ASRBase(torch.nn.Module):
     def __compute_model_outputs(self, inputs: torch.Tensor) -> torch.Tensor:
         outputs = inputs.transpose(1, 2)
         outputs = self.conv1(outputs)
+        outputs = self.conv2(outputs)
         outputs = outputs.transpose(1, 2)
 
-        outputs = self.sab1(outputs, outputs, outputs)[0]
-        outputs = self.activation(outputs)
+        outputs = self.sab1(outputs)
+        outputs = self.sab2(outputs)
 
         outputs = self.dense1(outputs)
         outputs = self.activation(outputs)

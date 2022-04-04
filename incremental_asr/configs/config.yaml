@@ -37,7 +37,6 @@ hop_length: 200
 # model related
 dropout: 0.2
 
-n_conv: 3
 conv_kernel_size: 10
 conv_stride: 2
 conv_padding: valid
