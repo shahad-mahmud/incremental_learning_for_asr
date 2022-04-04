@@ -23,14 +23,17 @@ if __name__ == "__main__":
     test_loader = modules.data.SpeechDataLoader('test', configs, tokenizer)
 
     model = modules.model.ASR(configs)
+    
+    strategy = pl.strategies.DDPStrategy(find_unused_parameters=False)
     trainer = pl.Trainer(
         max_epochs=configs['epochs'],
         accelerator='gpu',
-        devices=1
+        devices=2,
+        strategy=strategy,
     )
     
     trainer.fit(
         model=model,
         train_dataloaders=train_loader,
-        # val_dataloaders=valid_loader,
+        val_dataloaders=valid_loader,
     )

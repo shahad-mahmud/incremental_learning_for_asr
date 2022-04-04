@@ -28,16 +28,30 @@ class SpeechDataset(torch.utils.data.Dataset):
 
 
 class SpeechDataLoader(torch.utils.data.DataLoader):
-    def __init__(self, data_set_type: str, configs: dict,
-                tokenizer: sentencepiece.SentencePieceProcessor) -> None:
+    def __init__(
+        self, 
+        data_set_type: str, 
+        configs: dict,
+        tokenizer: sentencepiece.SentencePieceProcessor,
+        batch_sampler = None,
+        dataset=None,
+        sampler=None,
+        shuffle=False,
+    ) -> None:
+        self.configs = configs
+        self.data_set_type = data_set_type
         dataset = SpeechDataset(configs[f'{data_set_type}_annotation'])
         batch_size = configs[f'{data_set_type}_batch_size']
-        super().__init__(dataset,
-                        batch_size=batch_size,
-                        shuffle=configs['shuffle'],
-                        collate_fn=self.collate_function_padded,
-                        drop_last=True,
-                        num_workers=configs['num_workers'])
+        super().__init__(
+            dataset,
+            batch_size=batch_size,
+            shuffle=configs['shuffle'],
+            collate_fn=self.collate_function_padded,
+            drop_last=True,
+            num_workers=configs['num_workers'],
+            batch_sampler=batch_sampler,
+            sampler=sampler,
+        )
 
         self.tokenizer = tokenizer
 

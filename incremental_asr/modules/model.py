@@ -15,22 +15,37 @@ class ASR(pl.LightningModule):
     def forward(self, batch):
         return self.model(batch)
 
-    def training_step(self, batch, batch_idx):
-        ids, signals, trans, tokens, sig_lens, tok_lens = batch
+    def training_step(self, batch):
+        _, _, _, tokens, sig_lens, tok_lens = batch
         model_outputs = self.forward(batch)
         probs = self.log_prob(model_outputs, dim=-1)
 
         probs = probs.transpose(0, 1)
-        sig_lens = torch.full(size=(probs.shape[1], ),
-                            fill_value=probs.shape[0],
-                            dtype=torch.int32).to(probs.device)
+        sig_lens = torch.full(
+            size=(probs.shape[1],),
+            fill_value=probs.shape[0],
+            dtype=torch.int32).to(probs.device)
 
         loss = self.ctc(probs, tokens, sig_lens, tok_lens)
         return loss
 
+    def validation_step(self, batch, _):
+        _, _, _, tokens, sig_lens, tok_lens = batch
+        model_outputs = self.forward(batch)
+        probs = self.log_prob(model_outputs, dim=-1)
+
+        probs = probs.transpose(0, 1)
+        sig_lens = torch.full(
+            size=(probs.shape[1],),
+            fill_value=probs.shape[0],
+            dtype=torch.int32).to(probs.device)
+
+        loss = self.ctc(probs, tokens, sig_lens, tok_lens)
+        return loss
+    
     def configure_optimizers(self):
         optimizer = torch.optim.AdamW(self.parameters(),
-                                    lr=self.configs['learning_rate'])
+            lr=self.configs['learning_rate'])
         return optimizer
 
 
@@ -69,7 +84,7 @@ class ASRBase(torch.nn.Module):
         self.activation = torch.nn.LeakyReLU()
 
     def forward(self, batch):
-        ids, signals, trans, tokens, sig_lens, tok_lens = batch
+        _, signals, _, _, _, _ = batch
         spectograms = self.signal_featurizer(signals)
 
         outputs = self.__compute_model_outputs(spectograms)
