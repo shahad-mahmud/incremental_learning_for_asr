@@ -3,6 +3,7 @@ import utils
 import torch
 import modules
 import sentencepiece
+import pytorch_lightning as pl
 from tqdm import tqdm
 
 if __name__ == "__main__":
@@ -21,35 +22,18 @@ if __name__ == "__main__":
     valid_loader = modules.data.SpeechDataLoader('valid', configs, tokenizer)
     test_loader = modules.data.SpeechDataLoader('test', configs, tokenizer)
 
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    model = modules.model.ASR(configs).to(device)
-    optimizer = torch.optim.AdamW(model.parameters(), lr=configs['learning_rate'])
-    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
-        optimizer=optimizer,
-        mode='min',
-        factor=0.5,
-        patience=2
+    model = modules.model.ASR(configs)
+    
+    strategy = pl.strategies.DDPStrategy(find_unused_parameters=False)
+    trainer = pl.Trainer(
+        max_epochs=configs['epochs'],
+        accelerator='gpu',
+        devices=[1],
+        # strategy=strategy,
     )
     
-    def average(input):
-        sum = 0
-        for i in input:
-            sum += i.item()
-        
-        return sum / len(input)
-
-    for epoch in range(configs['epochs']):
-        losses = []
-        model.train()
-        with tqdm(train_loader, desc=f'epoch {epoch + 1}', dynamic_ncols=True) as bar:
-            for batch in bar:
-                loss = model(batch)
-                optimizer.zero_grad()
-                loss.backward()
-                optimizer.step()
-                
-                losses.append(loss)
-                bar.set_postfix(loss=average(losses))
-            average_loss = torch.stack(losses).mean()
-            scheduler.step(average_loss)
-
+    trainer.fit(
+        model=model,
+        train_dataloaders=train_loader,
+        val_dataloaders=valid_loader,
+    )
