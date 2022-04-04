@@ -3,6 +3,7 @@ import utils
 import torch
 import modules
 import sentencepiece
+from tqdm import tqdm
 
 if __name__ == "__main__":
     configs = utils.parsing.parse_args_and_configs()
@@ -21,6 +22,30 @@ if __name__ == "__main__":
     test_loader = modules.data.SpeechDataLoader('test', configs, tokenizer)
 
     model = modules.model.ASR(configs)
+    optimizer = torch.optim.AdamW(model.parameters(), lr=configs['learning_rate'])
+    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
+        optimizer=optimizer,
+        mode='min',
+        factor=0.5,
+        patience=2
+    )
+    
+    def average(input):
+        sum = 0
+        for i in input:
+            sum += i
+        
+        return sum / len(input)
 
-    for batch in train_loader:
-        model(batch)
+    losses = []
+    with tqdm(train_loader, desc='Training') as bar:
+        for batch in bar:
+            loss = model(batch)
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
+            
+            losses.append(loss.item())
+            bar.set_postfix(loss=average(losses))
+            
+

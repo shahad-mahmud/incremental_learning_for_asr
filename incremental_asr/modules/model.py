@@ -59,7 +59,6 @@ class ASR(torch.nn.Module):
                               dtype=torch.int32,
                               device=self.device)
         loss = self.ctc_loss(probalities, tokens, sig_lens, tok_lens)
-        print(loss)
         return loss
 
     def __compute_model_outputs(self, inputs):
