@@ -21,7 +21,8 @@ if __name__ == "__main__":
     valid_loader = modules.data.SpeechDataLoader('valid', configs, tokenizer)
     test_loader = modules.data.SpeechDataLoader('test', configs, tokenizer)
 
-    model = modules.model.ASR(configs)
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    model = modules.model.ASR(configs).to(device)
     optimizer = torch.optim.AdamW(model.parameters(), lr=configs['learning_rate'])
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
         optimizer=optimizer,
@@ -33,19 +34,22 @@ if __name__ == "__main__":
     def average(input):
         sum = 0
         for i in input:
-            sum += i
+            sum += i.item()
         
         return sum / len(input)
 
-    losses = []
-    with tqdm(train_loader, desc='Training') as bar:
-        for batch in bar:
-            loss = model(batch)
-            optimizer.zero_grad()
-            loss.backward()
-            optimizer.step()
-            
-            losses.append(loss.item())
-            bar.set_postfix(loss=average(losses))
-            
+    for epoch in range(configs['epochs']):
+        losses = []
+        model.train()
+        with tqdm(train_loader, desc=f'epoch {epoch + 1}', dynamic_ncols=True) as bar:
+            for batch in bar:
+                loss = model(batch)
+                optimizer.zero_grad()
+                loss.backward()
+                optimizer.step()
+                
+                losses.append(loss)
+                bar.set_postfix(loss=average(losses))
+            average_loss = torch.stack(losses).mean()
+            scheduler.step(average_loss)
 

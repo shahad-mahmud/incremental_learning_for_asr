@@ -39,6 +39,7 @@ class SpeechDataLoader(torch.utils.data.DataLoader):
                         drop_last=True)
 
         self.tokenizer = tokenizer
+        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
     def collate_function_padded(self, batch):
         ids, signals, transcriptions, batch_tokens = [], [], [], []
@@ -56,9 +57,9 @@ class SpeechDataLoader(torch.utils.data.DataLoader):
             token_lengths.append(len(tokens))
             batch_tokens.append(torch.tensor(tokens))
 
-        signals = torch.nn.utils.rnn.pad_sequence(signals, batch_first=True)
-        batch_tokens = torch.nn.utils.rnn.pad_sequence(batch_tokens, batch_first=True)
-        signal_lengths = torch.tensor(signal_lengths)
-        token_lengths = torch.tensor(token_lengths)
+        signals = torch.nn.utils.rnn.pad_sequence(signals, batch_first=True).to(self.device)
+        batch_tokens = torch.nn.utils.rnn.pad_sequence(batch_tokens, batch_first=True).to(self.device)
+        signal_lengths = torch.tensor(signal_lengths, device=self.device)
+        token_lengths = torch.tensor(token_lengths, device=self.device)
 
         return ids, signals, transcriptions, batch_tokens, signal_lengths, token_lengths

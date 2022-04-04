@@ -13,7 +13,7 @@ class ASR(torch.nn.Module):
         # model components
         self.conv = []
         for i in range(configs['n_conv']):
-            self.conv.append(
+            block = torch.nn.Sequential(
                 torch.nn.Conv1d(
                     in_channels=configs['n_mels'],
                     out_channels=configs['n_mels'],
@@ -21,12 +21,23 @@ class ASR(torch.nn.Module):
                     stride=configs['conv_stride'],
                     padding=configs['conv_padding'],
                     device=self.device,
-                ))
+                ),
+                torch.nn.LeakyReLU(),
+                torch.nn.Dropout(p=configs['dropout']),
+            )
+            self.conv.append(block)
 
         self.sabs = []
         for i in range(configs['n_sab']):
-            self.sabs.append(
+            block = torch.nn.Sequential(
                 torch.nn.MultiheadAttention(
+                    configs['n_mels'],
+                    configs['attention_heads'],
+                    batch_first=True,
+                    device=self.device,
+                )
+            )
+            self.sabs.append(torch.nn.MultiheadAttention(
                     configs['n_mels'],
                     configs['attention_heads'],
                     batch_first=True,
@@ -69,8 +80,10 @@ class ASR(torch.nn.Module):
 
         for sab in self.sabs:
             outputs = sab(outputs, outputs, outputs)[0]
+            outputs = torch.nn.GELU()(outputs)
 
         outputs = self.dense1(outputs)
+        outputs = torch.nn.GELU()(outputs)
         outputs = self.dense2(outputs)
 
         return outputs
