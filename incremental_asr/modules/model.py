@@ -1,10 +1,10 @@
 import torch
-import pytorch_lightning as pl
+from tqdm import tqdm
 from . import featurizers
 from . import blocks
 
 
-class ASR(pl.LightningModule):
+class ASR(torch.nn.Module):
     def __init__(self, configs: dict) -> None:
         super().__init__()
         self.configs = configs
@@ -12,27 +12,15 @@ class ASR(pl.LightningModule):
 
         self.log_prob = torch.nn.functional.log_softmax
         self.ctc = torch.nn.CTCLoss(blank=0, reduction='mean')
+        self.__configure_optimizers()
 
     def forward(self, batch):
-        return self.model(batch)
-
-    def training_step(self, batch):
-        _, _, _, tokens, sig_lens, tok_lens = batch
-        model_outputs = self.forward(batch)
-        probs = self.log_prob(model_outputs, dim=-1)
-
-        probs = probs.transpose(0, 1)
-        sig_lens = torch.full(
-            size=(probs.shape[1],),
-            fill_value=probs.shape[0],
-            dtype=torch.int32).to(probs.device)
-
-        loss = self.ctc(probs, tokens, sig_lens, tok_lens)
+        loss = self.__step(batch)
         return loss
 
-    def validation_step(self, batch, _):
+    def __step(self, batch):
         _, _, _, tokens, sig_lens, tok_lens = batch
-        model_outputs = self.forward(batch)
+        model_outputs = self.model(batch)
         probs = self.log_prob(model_outputs, dim=-1)
 
         probs = probs.transpose(0, 1)
@@ -44,17 +32,60 @@ class ASR(pl.LightningModule):
         loss = self.ctc(probs, tokens, sig_lens, tok_lens)
         return loss
     
-    def configure_optimizers(self):
-        optimizer = torch.optim.AdamW(self.parameters(),
+    def __configure_optimizers(self):
+        self.optimizer = torch.optim.AdamW(self.model.parameters(),
             lr=self.configs['learning_rate'])
-        return optimizer
+        self.scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
+            optimizer=self.optimizer,
+            mode='min',
+            factor=self.configs['lr_decay_factor'],
+            verbose=True,
+        )
+    
+    def fit(self, train_loader, valid_loader, epochs=5):
+        for epoch in range(epochs):
+            self.__fit_training_dataloader(train_loader, epoch + 1)
+            self.__fit_validation_dataloader(valid_loader, epoch + 1)
+            
+    def __fit_validation_dataloader(self, valid_loader, epoch_num):
+        average_loss = 0.0
+        self.model.eval()
+        with tqdm(
+            valid_loader, 
+            desc=f'Validation',
+            dynamic_ncols=True,
+        ) as loader:
+            for batch in loader:
+                loss = self.__step(batch)
+                
+                average_loss += loss.item()
+                loader.set_postfix(loss=average_loss/(loader.n+1))
+    
+    def __fit_training_dataloader(self, train_loader, epoch_num):
+        average_loss = 0.0
+        self.model.train()
+        with tqdm(
+            train_loader, 
+            desc=f'Epoch {epoch_num}',
+            dynamic_ncols=True,
+        ) as loader:
+            for batch in loader:
+                self.optimizer.zero_grad()
+                loss = self.__step(batch)
+                loss.backward()
+                self.optimizer.step()
+
+                average_loss += loss.item()
+                loader.set_postfix(loss=average_loss/(loader.n+1))
+    
 
 
 class ASRBase(torch.nn.Module):
     def __init__(self, configs: dict) -> None:
         super().__init__()
         self.configs = configs
-        self.signal_featurizer = featurizers.LogMelSpectogram(configs)
+        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        self.signal_featurizer = featurizers.LogMelSpectogram(configs).to(self.device)
 
         self.conv1 = blocks.Conv1dBlock(
             in_channels=configs['n_mels'],
@@ -96,6 +127,7 @@ class ASRBase(torch.nn.Module):
 
     def forward(self, batch):
         _, signals, _, _, _, _ = batch
+        signals = signals.to(self.device)
         spectograms = self.signal_featurizer(signals)
 
         outputs = self.__compute_model_outputs(spectograms)

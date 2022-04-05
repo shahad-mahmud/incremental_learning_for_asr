@@ -3,8 +3,6 @@ import utils
 import torch
 import modules
 import sentencepiece
-import pytorch_lightning as pl
-from tqdm import tqdm
 
 if __name__ == "__main__":
     configs = utils.parsing.parse_args_and_configs()
@@ -22,18 +20,10 @@ if __name__ == "__main__":
     valid_loader = modules.data.SpeechDataLoader('valid', configs, tokenizer)
     test_loader = modules.data.SpeechDataLoader('test', configs, tokenizer)
 
-    model = modules.model.ASR(configs)
-    
-    strategy = pl.strategies.DDPStrategy(find_unused_parameters=False)
-    trainer = pl.Trainer(
-        max_epochs=configs['epochs'],
-        accelerator='gpu',
-        devices=[1],
-        # strategy=strategy,
-    )
-    
-    trainer.fit(
-        model=model,
-        train_dataloaders=train_loader,
-        val_dataloaders=valid_loader,
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    model = modules.model.ASR(configs).to(device)
+    model.fit(
+        train_loader=train_loader,
+        valid_loader=valid_loader,
+        epochs=configs['epochs'],
     )

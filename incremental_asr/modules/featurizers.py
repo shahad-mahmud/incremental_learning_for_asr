@@ -4,7 +4,6 @@ import torchaudio
 class LogMelSpectogram(torch.nn.Module):
     def __init__(self, configs: dict) -> None:
         super().__init__()
-        
         self.mel_spectogram = torchaudio.transforms.MelSpectrogram(
             sample_rate=configs['sample_rate'],
             n_fft=configs['n_fft'],

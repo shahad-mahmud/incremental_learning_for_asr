@@ -32,11 +32,7 @@ class SpeechDataLoader(torch.utils.data.DataLoader):
         self, 
         data_set_type: str, 
         configs: dict,
-        tokenizer: sentencepiece.SentencePieceProcessor,
-        batch_sampler = None,
-        dataset=None,
-        sampler=None,
-        shuffle=False,
+        tokenizer: sentencepiece.SentencePieceProcessor
     ) -> None:
         self.configs = configs
         self.data_set_type = data_set_type
@@ -49,8 +45,7 @@ class SpeechDataLoader(torch.utils.data.DataLoader):
             collate_fn=self.collate_function_padded,
             drop_last=True,
             num_workers=configs['num_workers'],
-            batch_sampler=batch_sampler,
-            sampler=sampler,
+            pin_memory=True
         )
 
         self.tokenizer = tokenizer
