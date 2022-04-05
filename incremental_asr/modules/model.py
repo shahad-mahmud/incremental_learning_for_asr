@@ -1,4 +1,3 @@
-from turtle import forward
 import torch
 import sentencepiece
 from tqdm import tqdm
@@ -6,7 +5,9 @@ from . import featurizers
 from . import blocks
 from . import decoding
 import utils
+import os
 
+from torch.utils.tensorboard import SummaryWriter
 
 class ASR(torch.nn.Module):
     def __init__(self, configs: dict) -> None:
@@ -21,6 +22,20 @@ class ASR(torch.nn.Module):
         # for decoding
         self.tokenizer = sentencepiece.SentencePieceProcessor(
             model_file=configs['tokenizer_path'])
+
+        # for checkpointing
+        self.epoch = 0
+        self.best_val_loss = float('inf')
+        
+        if os.path.exists(os.path.join(self.configs['result_dir'], f'final_model.pt')):
+            checkpoint = torch.load(os.path.join(self.configs['result_dir'], f'final_model.pt'))
+            self.epoch = checkpoint['epoch']
+            self.model.load_state_dict(checkpoint['model_state_dict'])
+            self.optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+            self.scheduler.load_state_dict(checkpoint['scheduler_state_dict'])
+            
+        # logging
+        self.writter = SummaryWriter(log_dir=os.path.join(self.configs['result_dir'], 'logs'))
 
     def forward(self, batch):
         _, loss = self.__step(batch)
@@ -48,14 +63,52 @@ class ASR(torch.nn.Module):
             mode='min',
             factor=self.configs['lr_decay_factor'],
             verbose=True,
+            patience=1,
         )
 
     def fit(self, train_loader, valid_loader, epochs=5):
         for epoch in range(epochs):
-            self.__fit_training_dataloader(train_loader, epoch + 1)
-            self.__fit_validation_dataloader(valid_loader, epoch + 1)
+            loss = self.__fit_training_dataloader(train_loader, epoch + 1)
+            val_loss, wer = self.__fit_validation_dataloader(
+                valid_loader)
+            self.scheduler.step(val_loss)
+            self.save_checkpoint(epoch, loss, val_loss)
+            self.writter.add_scalar('Loss/valid', val_loss)
+            self.writter.add_scalar('WER/valid', wer)
 
-    def __fit_validation_dataloader(self, valid_loader, epoch_num):
+    def save_checkpoint(self, epoch, loss, val_loss):
+        if not os.path.exists(self.configs['result_dir']):
+            os.makedirs(self.configs['result_dir'])
+            
+        save_path = os.path.join(self.configs['result_dir'], f'final_model.pt')
+        best_save_path = os.path.join(self.configs['result_dir'],
+                                      f'best_model.pt')
+
+        if val_loss < self.best_val_loss:
+            self.best_val_loss = val_loss
+            print('Achieved new best validation loss: {}'.format(val_loss))
+
+            torch.save(
+                {
+                    'epoch': epoch,
+                    'model_state_dict': self.model.state_dict(),
+                    'optimizer_state_dict': self.optimizer.state_dict(),
+                    'scheduler_state_dict': self.scheduler.state_dict(),
+                    'loss': loss,
+                    'val_loss': val_loss,
+                }, best_save_path)
+
+        torch.save(
+            {
+                'epoch': epoch,
+                'model_state_dict': self.model.state_dict(),
+                'optimizer_state_dict': self.optimizer.state_dict(),
+                'scheduler_state_dict': self.scheduler.state_dict(),
+                'loss': loss,
+                'val_loss': val_loss,
+            }, save_path)
+
+    def __fit_validation_dataloader(self, valid_loader):
         average_loss = 0.0
         average_wer = 0.0
         self.model.eval()
@@ -74,6 +127,7 @@ class ASR(torch.nn.Module):
                 average_loss += loss.item()
                 loader.set_postfix(loss=average_loss / (loader.n + 1),
                                    wer=average_wer / (loader.n + 1))
+        return average_loss / len(valid_loader), average_wer / len(valid_loader)
 
     def __fit_training_dataloader(self, train_loader, epoch_num):
         average_loss = 0.0
@@ -90,7 +144,9 @@ class ASR(torch.nn.Module):
                 self.optimizer.step()
 
                 average_loss += loss.item()
+                self.writter.add_scalar('Loss/train', average_loss / (loader.n + 1))
                 loader.set_postfix(loss=average_loss / (loader.n + 1))
+        return average_loss / len(train_loader)
 
 
 class RnnASR(torch.nn.Module):

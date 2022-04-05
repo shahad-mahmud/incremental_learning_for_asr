@@ -12,7 +12,6 @@ def greedy_decode(logits, tokenizer):
         filtered = filter_output(decoded_tokens)
         text = ''.join(filtered)
         batch_outs.append(text)
-        print(text)
     return batch_outs
         
 def filter_output(string_pred: list, blank_id=0):
