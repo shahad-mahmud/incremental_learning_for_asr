@@ -1,29 +1,43 @@
 import os
+import sys
 import utils
-import torch
 import modules
-import sentencepiece
+import speechbrain as sb
+
+from hyperpyyaml import load_hyperpyyaml
 
 if __name__ == "__main__":
-    configs = utils.parsing.parse_args_and_configs()
-
-    if not configs['skip_data_preparation']:
-        utils.data.prepare_annotation_files(configs)
-
-    if not os.path.exists(configs['result_dir']):
-        os.makedirs(configs['result_dir'], exist_ok=True)
-
-    tokenizer = sentencepiece.SentencePieceProcessor(
-        model_file=configs['tokenizer_path'])
-
-    train_loader = modules.data.SpeechDataLoader('train', configs, tokenizer)
-    valid_loader = modules.data.SpeechDataLoader('valid', configs, tokenizer)
-    test_loader = modules.data.SpeechDataLoader('test', configs, tokenizer)
-
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    model = modules.model.ASR(configs).to(device)
+    hparams_file, run_opts, overrides = sb.parse_arguments(sys.argv[1:])
+    
+    sb.utils.distributed.ddp_init_group(run_opts)
+    with open(hparams_file) as fin:
+        hparams = load_hyperpyyaml(fin, overrides)
+        
+    sb.create_experiment_directory(
+        experiment_directory=hparams["result_dir"],
+        hyperparams_to_save=hparams_file,
+        overrides=overrides,
+    )
+    
+    datasets = utils.sb.dataio_prepare(hparams)
+    model = modules.model.ASR(
+        modules=hparams['modules'],
+        opt_class=hparams['opt_class'],
+        hparams=hparams,
+        run_opts=run_opts,
+        checkpointer=hparams['checkpointer'],
+    )
+    
     model.fit(
-        train_loader=train_loader,
-        valid_loader=valid_loader,
-        epochs=configs['epochs'],
+        epoch_counter=model.hparams.epoch_counter,
+        train_set=datasets['train'],
+        valid_set=datasets['valid'],
+        train_loader_kwargs=hparams['train_dataloader_opts'],
+        valid_loader_kwargs=hparams['valid_dataloader_opts'],
+    )
+    
+    model.evaluate(
+        test_set=datasets["test"],
+        min_key="WER",
+        test_loader_kwargs=hparams["test_dataloader_opts"],
     )
