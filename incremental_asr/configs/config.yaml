@@ -1,20 +1,20 @@
 # basic configs
 run_num: 0
 data_folder: ../data
-result_dir: !ref ../results/asr/run_<run_num>
+result_dir: !ref ../results/sb_asr/run_<run_num>
 wer_file: !ref <result_dir>/wer.txt
 save_folder: !ref <result_dir>/save
 train_log: !ref <result_dir>/train_log.txt
 
 # data paths
-tokenizer_model: ../results/tokenizer/run_0/bpe_1000.model
+tokenizer_model: ../results/tokenizer/run_1/bpe_256.model
 
 train_annotation: ../jsons/train.json
 valid_annotation: ../jsons/valid.json
 test_annotation: ../jsons/test.json
 
 # Training parameters
-number_of_epochs: 60
+number_of_epochs: 30
 number_of_ctc_epochs: 15
 batch_size: 16
 lr: 1.0
@@ -32,19 +32,19 @@ n_mels: 40
 activation: !name:torch.nn.LeakyReLU
 dropout: 0.15
 cnn_blocks: 2
-cnn_channels: (128, 256)
+cnn_channels: (64, 128)
 inter_layer_pooling_size: (2, 2)
 cnn_kernelsize: (3, 3)
 time_pooling_size: 4
 rnn_class: !name:speechbrain.nnet.RNN.LSTM
-rnn_layers: 4
-rnn_neurons: 1024
+rnn_layers: 2
+rnn_neurons: 512
 rnn_bidirectional: True
 dnn_blocks: 2
 dnn_neurons: 512
 emb_size: 256
-dec_neurons: 1024
-output_neurons: 1000  # Number of tokens 
+dec_neurons: 512
+output_neurons: 256  # Number of tokens 
 blank_index: 0
 bos_index: 0
 eos_index: 0
@@ -124,11 +124,11 @@ decoder: !new:speechbrain.nnet.RNN.AttentionalRNNDecoder
     rnn_type: gru
     attn_type: location
     hidden_size: !ref <dec_neurons>
-    attn_dim: 1024
+    attn_dim: 512
     num_layers: 1
     scaling: 1.0
     channels: 10
-    kernel_size: 100
+    kernel_size: 50
     re_init: True
     dropout: !ref <dropout>
 
