@@ -63,7 +63,7 @@ class ASR(torch.nn.Module):
             mode='min',
             factor=self.configs['lr_decay_factor'],
             verbose=True,
-            patience=1,
+            patience=0,
         )
 
     def fit(self, train_loader, valid_loader, epochs=5):
@@ -73,8 +73,8 @@ class ASR(torch.nn.Module):
                 valid_loader)
             self.scheduler.step(val_loss)
             self.save_checkpoint(epoch, loss, val_loss)
-            self.writter.add_scalar('Loss/valid', val_loss)
-            self.writter.add_scalar('WER/valid', wer)
+            self.writter.add_scalar('Loss/valid', val_loss, epoch)
+            self.writter.add_scalar('WER/valid', wer, epoch)
 
     def save_checkpoint(self, epoch, loss, val_loss):
         if not os.path.exists(self.configs['result_dir']):
@@ -144,7 +144,7 @@ class ASR(torch.nn.Module):
                 self.optimizer.step()
 
                 average_loss += loss.item()
-                self.writter.add_scalar('Loss/train', average_loss / (loader.n + 1))
+                self.writter.add_scalar('Loss/train', average_loss / (loader.n + 1), (epoch_num-1)*len(train_loader)+loader.n)
                 loader.set_postfix(loss=average_loss / (loader.n + 1))
         return average_loss / len(train_loader)
 
@@ -158,16 +158,16 @@ class RnnASR(torch.nn.Module):
         self.signal_featurizer = featurizers.LogMelSpectogram(configs).to(
             self.device)
 
-        self.conv = blocks.Conv1dBlock(
+        self.conv = blocks.Conv2dBlock(
             in_channels=configs['n_mels'],
-            out_channels=configs['n_mels'],
+            out_channels=256,
             kernel_size=configs['conv_kernel_size'],
             stride=configs['conv_stride'],
             padding=configs['conv_padding'],
         )
 
         self.dense = torch.nn.Sequential(
-            torch.nn.Linear(configs['n_mels'], 128),
+            torch.nn.Linear(256, 128),
             torch.nn.LayerNorm(128),
             torch.nn.GELU(),
             torch.nn.Dropout(p=configs['dropout']),

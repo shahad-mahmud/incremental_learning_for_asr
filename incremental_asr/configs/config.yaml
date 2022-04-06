@@ -1,5 +1,5 @@
 # basic configs
-run_num: 0
+run_num: 2
 result_dir: '../results/asr/'
 
 # data related
@@ -22,7 +22,7 @@ valid_batch_size: 64
 test_batch_size: 1
 
 shuffle: false
-learning_rate: 0.1
+learning_rate: 0.01
 lr_decay_factor: 0.1
 
 # tokenizer related
@@ -38,7 +38,7 @@ hop_length: 200
 # model related
 dropout: 0.2
 
-conv_kernel_size: 10
+conv_kernel_size: 3
 conv_stride: 2
 conv_padding: valid
 
