@@ -1,11 +1,40 @@
 import torch
 import speechbrain as sb
 
+from speechbrain.pretrained import Pretrained, fetching
+from speechbrain.utils.distributed import run_on_main
+
+from . import losses
+from .teacher import Teacher
+
 
 class ASR(sb.Brain):
+    def __init__(  # noqa: C901
+        self,
+        modules=None,
+        opt_class=None,
+        hparams=None,
+        run_opts=None,
+        checkpointer=None,
+        teacher_dir=None,
+    ):
+        super().__init__(
+            modules=modules,
+            opt_class=opt_class,
+            hparams=hparams,
+            run_opts=run_opts,
+            checkpointer=checkpointer,
+        )
+        
+        if teacher_dir is None:
+            raise ValueError("teacher_dir must be specified")
+        self.teacher = Teacher.from_hparams(teacher_dir)
+        # TODO: solve device issue
+
     def compute_forward(self, batch, stage):
         batch = batch.to(self.device)
-        features, self.feature_lengths = self.prepare_features(stage, batch.sig)
+        features, self.feature_lengths = self.prepare_features(
+            stage, batch.sig)
         tokens_bos, _ = self.prepare_tokens(stage, batch.tokens_bos)
 
         encoder_outs = self.modules.encoder(features.detach())
@@ -16,6 +45,12 @@ class ASR(sb.Brain):
 
         logits = self.modules.seq_lin(decoder_outs)
         predictions = {"seq_log_probs": self.hparams.log_softmax(logits)}
+        predictions = {"teacher_log_probs": self.teacher.compute_probs(
+            features,
+            self.feature_lengths,
+            tokens_bos
+        )}
+        
 
         if self.is_ctc_active(stage):
             ctc_logits = self.modules.ctc_lin(encoder_outs)
@@ -55,7 +90,7 @@ class ASR(sb.Brain):
 
             self.wer_metric.append(batch.id, predicted_words, target_words)
             self.cer_metric.append(batch.id, predicted_words, target_words)
-            
+
         return loss
 
     def prepare_features(self, stage, audio):
@@ -87,12 +122,12 @@ class ASR(sb.Brain):
             return False
         current_epoch = self.hparams.epoch_counter.current
         return current_epoch <= self.hparams.number_of_ctc_epochs
-    
+
     def on_stage_start(self, stage, epoch):
         if stage != sb.Stage.TRAIN:
             self.cer_metric = self.hparams.cer_computer()
             self.wer_metric = self.hparams.error_rate_computer()
-    
+
     def on_stage_end(self, stage, stage_loss, epoch):
         stage_stats = {"loss": stage_loss}
         if stage == sb.Stage.TRAIN:
@@ -107,20 +142,25 @@ class ASR(sb.Brain):
             sb.nnet.schedulers.update_learning_rate(self.optimizer, new_lr)
 
             self.hparams.train_logger.log_stats(
-                stats_meta={"epoch": epoch, "lr": old_lr},
+                stats_meta={
+                    "epoch": epoch,
+                    "lr": old_lr
+                },
                 train_stats=self.train_stats,
                 valid_stats=stage_stats,
             )
 
             self.checkpointer.save_and_keep_only(
-                meta={"WER": stage_stats["WER"]}, min_keys=["WER"],
+                meta={"WER": stage_stats["WER"]},
+                min_keys=["WER"],
             )
 
         elif stage == sb.Stage.TEST:
             self.hparams.train_logger.log_stats(
-                stats_meta={"Epoch loaded": self.hparams.epoch_counter.current},
+                stats_meta={
+                    "Epoch loaded": self.hparams.epoch_counter.current
+                },
                 test_stats=stage_stats,
             )
             with open(self.hparams.wer_file, "w") as w:
                 self.wer_metric.write_stats(w)
-            

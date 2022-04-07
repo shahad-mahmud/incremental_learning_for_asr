@@ -13,7 +13,6 @@ def dataio_prepare(hparams):
         "words", "tokens_list", "tokens_bos", "tokens_eos", "tokens"
     )
     def text_pipeline(words):
-        """Processes the transcriptions to generate proper labels"""
         yield words
         tokens_list = hparams['tokenizer'].encode_as_ids(words)
         yield tokens_list

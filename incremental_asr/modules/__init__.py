@@ -1,1 +1,1 @@
-from . import data, featurizers, model, losses
+from . import data, featurizers, model, losses, incremental_model
