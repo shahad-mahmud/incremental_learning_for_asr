@@ -1,9 +1,15 @@
 import os
+import time
 import torch
 import speechbrain as sb
 
+from tqdm import tqdm
+from enum import Enum, auto
+from torch.utils.data import DataLoader
+
 from speechbrain.pretrained import Pretrained, fetching
 from speechbrain.utils.distributed import run_on_main
+from speechbrain.dataio.dataloader import LoopedLoader
 
 from . import losses
 from .teacher import Teacher
@@ -35,6 +41,8 @@ class ASR(sb.Brain):
         teacher_model_path = os.path.join(teacher_dir, 'save', 'model.ckpt')
         teacher_state_dicts = torch.load(teacher_model_path)
         self.hparams.model.load_state_dict(teacher_state_dicts)
+        
+        self.avg_rbkd_loss = 0
 
     def compute_forward(self, batch, stage):
         batch = batch.to(self.device)
@@ -49,7 +57,7 @@ class ASR(sb.Brain):
                                                self.feature_lengths)
 
         logits = self.modules.seq_lin(decoder_outs)
-        predictions = {"seq_log_probs": self.hparams.log_softmax(logits)}
+        predictions = {"student_log_probs": self.hparams.log_softmax(logits)}
         predictions['teacher_log_probs'] = self.teacher.compute_probs(
             features, self.feature_lengths, tokens_bos)
 
@@ -67,20 +75,27 @@ class ASR(sb.Brain):
     def compute_objectives(self, predictions, batch, stage):
         tokens_eos, tokens_eos_lens = self.prepare_tokens(
             stage, batch.tokens_eos)
-        loss = sb.nnet.losses.nll_loss(
-            log_probabilities=predictions["seq_log_probs"],
+        student_loss = sb.nnet.losses.nll_loss(
+            log_probabilities=predictions["student_log_probs"],
             targets=tokens_eos,
             length=tokens_eos_lens,
             label_smoothing=self.hparams.label_smoothing,
         )
+        
+        rbkd_loss = losses.rbkd(predictions["teacher_log_probs"], predictions["student_log_probs"])
+        loss = student_loss + self.hparams.rbkd_factor * rbkd_loss
+        
+        self.avg_rbkd_loss = self.update_average(
+            rbkd_loss, self.avg_rbkd_loss
+        )
 
         if self.is_ctc_active(stage):
             tokens, tokens_lens = self.prepare_tokens(stage, batch.tokens)
-            loss_ctc = self.hparams.ctc_cost(predictions["ctc_log_probs"],
+            ctc_loss = self.hparams.ctc_cost(predictions["ctc_log_probs"],
                                              tokens, self.feature_lengths,
                                              tokens_lens)
             loss *= 1 - self.hparams.ctc_weight
-            loss += self.hparams.ctc_weight * loss_ctc
+            loss += self.hparams.ctc_weight * ctc_loss
 
         if stage != sb.Stage.TRAIN:
             predicted_words = [
@@ -165,3 +180,121 @@ class ASR(sb.Brain):
             )
             with open(self.hparams.wer_file, "w") as w:
                 self.wer_metric.write_stats(w)
+    
+    def fit(
+        self,
+        epoch_counter,
+        train_set,
+        valid_set=None,
+        progressbar=None,
+        train_loader_kwargs={},
+        valid_loader_kwargs={},
+    ):
+        if not (
+            isinstance(train_set, DataLoader)
+            or isinstance(train_set, LoopedLoader)
+        ):
+            train_set = self.make_dataloader(
+                train_set, stage=sb.Stage.TRAIN, **train_loader_kwargs
+            )
+        if valid_set is not None and not (
+            isinstance(valid_set, DataLoader)
+            or isinstance(valid_set, LoopedLoader)
+        ):
+            valid_set = self.make_dataloader(
+                valid_set,
+                stage=sb.Stage.VALID,
+                ckpt_prefix=None,
+                **valid_loader_kwargs,
+            )
+
+        self.on_fit_start()
+
+        if progressbar is None:
+            progressbar = not self.noprogressbar
+
+        for epoch in epoch_counter:
+
+            # Training stage
+            self.on_stage_start(Stage.TRAIN, epoch)
+            self.modules.train()
+
+            # Reset nonfinite count to 0 each epoch
+            self.nonfinite_count = 0
+
+            if self.train_sampler is not None and hasattr(
+                self.train_sampler, "set_epoch"
+            ):
+                self.train_sampler.set_epoch(epoch)
+
+            # Time since last intra-epoch checkpoint
+            last_ckpt_time = time.time()
+
+            enable = progressbar and sb.utils.distributed.if_main_process()
+            with tqdm(
+                train_set,
+                initial=self.step,
+                dynamic_ncols=True,
+                disable=not enable,
+            ) as t:
+                for batch in t:
+                    self.step += 1
+                    loss = self.fit_batch(batch)
+                    self.avg_train_loss = self.update_average(
+                        loss, self.avg_train_loss
+                    )
+                    t.set_postfix(train_loss=self.avg_train_loss, rbkd_loss=self.avg_rbkd_loss)
+
+                    if self.debug and self.step == self.debug_batches:
+                        break
+
+                    if (
+                        self.checkpointer is not None
+                        and self.ckpt_interval_minutes > 0
+                        and time.time() - last_ckpt_time
+                        >= self.ckpt_interval_minutes * 60.0
+                    ):
+                        run_on_main(self._save_intra_epoch_ckpt)
+                        last_ckpt_time = time.time()
+
+            # Run train "on_stage_end" on all processes
+            self.on_stage_end(Stage.TRAIN, self.avg_train_loss, epoch)
+            self.avg_train_loss = 0.0
+            self.step = 0
+
+            # Validation stage
+            if valid_set is not None:
+                self.on_stage_start(Stage.VALID, epoch)
+                self.modules.eval()
+                avg_valid_loss = 0.0
+                with torch.no_grad():
+                    for batch in tqdm(
+                        valid_set, dynamic_ncols=True, disable=not enable
+                    ):
+                        self.step += 1
+                        loss = self.evaluate_batch(batch, stage=Stage.VALID)
+                        avg_valid_loss = self.update_average(
+                            loss, avg_valid_loss
+                        )
+
+                        # Debug mode only runs a few batches
+                        if self.debug and self.step == self.debug_batches:
+                            break
+
+                    # Only run validation "on_stage_end" on main process
+                    self.step = 0
+                    run_on_main(
+                        self.on_stage_end,
+                        args=[Stage.VALID, avg_valid_loss, epoch],
+                    )
+
+            # Debug mode only runs a few epochs
+            if self.debug and epoch == self.debug_epochs:
+                break
+            
+class Stage(Enum):
+    """Simple enum to track stage of experiments."""
+
+    TRAIN = auto()
+    VALID = auto()
+    TEST = auto()

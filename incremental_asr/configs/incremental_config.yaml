@@ -6,8 +6,11 @@ wer_file: !ref <result_dir>/wer.txt
 save_folder: !ref <result_dir>/save
 train_log: !ref <result_dir>/train_log.txt
 
+# incremental parameters
 teacher_run_num: 0
 teacher_dir: !ref ../results/sb_asr/run_<teacher_run_num>
+
+rbkd_factor: 0.05
 
 # data paths
 tokenizer_model: ../results/tokenizer/run_1/bpe_256.model
