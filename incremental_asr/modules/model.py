@@ -1,5 +1,6 @@
 import torch
 import speechbrain as sb
+from . import losses
 
 
 class ASR(sb.Brain):
@@ -55,7 +56,7 @@ class ASR(sb.Brain):
 
             self.wer_metric.append(batch.id, predicted_words, target_words)
             self.cer_metric.append(batch.id, predicted_words, target_words)
-
+            
         return loss
 
     def prepare_features(self, stage, audio):

@@ -1,5 +1,5 @@
 # basic configs
-run_num: 0
+run_num: 100
 data_folder: ../data
 result_dir: !ref ../results/sb_asr/run_<run_num>
 wer_file: !ref <result_dir>/wer.txt
