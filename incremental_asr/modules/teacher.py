@@ -11,19 +11,21 @@ class Teacher(Pretrained):
         "encoder",
         "decoder",
     ]
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-    
+
     def compute_probs(self, features, feature_lengths, tokens):
         with torch.no_grad():
             encoder_out = self.modules.encoder(features.detach())
-            
+
             embeddings = self.modules.embedding(tokens)
-            decoder_outs, _ = self.modules.decoder(embeddings, encoder_out, feature_lengths)
-            
+            decoder_outs, _ = self.modules.decoder(embeddings, encoder_out,
+                                                   feature_lengths)
+
             logits = self.modules.seq_lin(decoder_outs)
-            
-        return self.hparams.log_softmax(logits)    
+
+        return self.hparams.log_softmax(logits)
 
     @classmethod
     def from_hparams(

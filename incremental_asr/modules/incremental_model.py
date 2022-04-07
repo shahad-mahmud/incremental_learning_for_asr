@@ -25,11 +25,11 @@ class ASR(sb.Brain):
             run_opts=run_opts,
             checkpointer=checkpointer,
         )
-        
+
         if teacher_dir is None:
             raise ValueError("teacher_dir must be specified")
-        self.teacher = Teacher.from_hparams(teacher_dir)
-        # TODO: solve device issue
+        self.teacher = Teacher.from_hparams(teacher_dir,
+                                            run_opts={'device': self.device})
 
     def compute_forward(self, batch, stage):
         batch = batch.to(self.device)
@@ -45,12 +45,8 @@ class ASR(sb.Brain):
 
         logits = self.modules.seq_lin(decoder_outs)
         predictions = {"seq_log_probs": self.hparams.log_softmax(logits)}
-        predictions = {"teacher_log_probs": self.teacher.compute_probs(
-            features,
-            self.feature_lengths,
-            tokens_bos
-        )}
-        
+        predictions['teacher_log_probs'] = self.teacher.compute_probs(
+            features, self.feature_lengths, tokens_bos)
 
         if self.is_ctc_active(stage):
             ctc_logits = self.modules.ctc_lin(encoder_outs)
