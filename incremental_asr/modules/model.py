@@ -22,10 +22,10 @@ class ASR(sb.Brain):
             predictions["ctc_log_probs"] = self.hparams.log_softmax(ctc_logits)
         elif stage == sb.Stage.VALID:
             predictions["tokens"], _ = self.hparams.valid_search(
-                encoder_outs, self.feat_lens)
+                encoder_outs, self.feature_lengths)
         elif stage == sb.Stage.TEST:
             predictions["tokens"], _ = self.hparams.valid_search(
-                encoder_outs, self.feat_lens)
+                encoder_outs, self.feature_lengths)
         return predictions
 
     def compute_objectives(self, predictions, batch, stage):
@@ -48,7 +48,7 @@ class ASR(sb.Brain):
 
         if stage != sb.Stage.TRAIN:
             predicted_words = [
-                self.hparams['tokenizer'].decode_ids(prediction).split(" ")
+                self.hparams.tokenizer.decode_ids(prediction).split(" ")
                 for prediction in predictions["tokens"]
             ]
             target_words = [words.split(" ") for words in batch.words]
