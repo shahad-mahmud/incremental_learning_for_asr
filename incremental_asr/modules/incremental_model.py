@@ -1,3 +1,4 @@
+import os
 import torch
 import speechbrain as sb
 
@@ -9,7 +10,7 @@ from .teacher import Teacher
 
 
 class ASR(sb.Brain):
-    def __init__(  # noqa: C901
+    def __init__(  
         self,
         modules=None,
         opt_class=None,
@@ -30,6 +31,10 @@ class ASR(sb.Brain):
             raise ValueError("teacher_dir must be specified")
         self.teacher = Teacher.from_hparams(teacher_dir,
                                             run_opts={'device': self.device})
+        
+        teacher_model_path = os.path.join(teacher_dir, 'save', 'model.ckpt')
+        teacher_state_dicts = torch.load(teacher_model_path)
+        self.hparams.model.load_state_dict(teacher_state_dicts)
 
     def compute_forward(self, batch, stage):
         batch = batch.to(self.device)
