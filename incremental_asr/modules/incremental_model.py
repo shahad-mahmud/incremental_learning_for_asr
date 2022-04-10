@@ -1,5 +1,6 @@
 import os
 import time
+import yaml
 import torch
 import speechbrain as sb
 
@@ -25,6 +26,7 @@ class ASR(sb.Brain):
         checkpointer=None,
         teacher_dir=None,
     ):
+        self.avg_rbkd_loss = 0.0
         super().__init__(
             modules=modules,
             opt_class=opt_class,
@@ -41,8 +43,6 @@ class ASR(sb.Brain):
         teacher_model_path = os.path.join(teacher_dir, 'save', 'model.ckpt')
         teacher_state_dicts = torch.load(teacher_model_path)
         self.hparams.model.load_state_dict(teacher_state_dicts)
-        
-        self.avg_rbkd_loss = 0.0
         
         if self.checkpointer is not None:
             self.checkpointer.add_recoverable("brain", self)
@@ -86,10 +86,10 @@ class ASR(sb.Brain):
         )
         
         rbkd_loss = losses.rbkd(predictions["teacher_log_probs"], predictions["student_log_probs"])
-        loss = student_loss + self.hparams.rbkd_factor * rbkd_loss
+        loss = (self.hparams.rbkd_factor) * student_loss + self.hparams.rbkd_factor * rbkd_loss
         
         self.avg_rbkd_loss = self.update_average(
-            rbkd_loss, self.avg_rbkd_loss
+            rbkd_loss.detach().cpu(), self.avg_rbkd_loss
         )
 
         if self.is_ctc_active(stage):
@@ -263,6 +263,7 @@ class ASR(sb.Brain):
             # Run train "on_stage_end" on all processes
             self.on_stage_end(Stage.TRAIN, self.avg_train_loss, epoch)
             self.avg_train_loss = 0.0
+            self.avg_rbkd_loss = 0.0
             self.step = 0
 
             # Validation stage
@@ -294,6 +295,26 @@ class ASR(sb.Brain):
             # Debug mode only runs a few epochs
             if self.debug and epoch == self.debug_epochs:
                 break
+    
+    @sb.utils.checkpoints.mark_as_saver
+    def _save(self, path):
+        save_dict = {
+            "step": self.step,
+            "avg_train_loss": self.avg_train_loss,
+            "avg_rbkd_loss": self.avg_rbkd_loss,
+        }
+        with open(path, "w") as w:
+            w.write(yaml.dump(save_dict))
+
+    @sb.utils.checkpoints.mark_as_loader
+    def _recover(self, path, end_of_epoch, device):
+        del end_of_epoch
+        del device
+        with open(path) as f:
+            save_dict = yaml.safe_load(f)
+        self.step = save_dict["step"]
+        self.avg_train_loss = save_dict["avg_train_loss"]
+        self.avg_rbkd_loss = save_dict["avg_rbkd_loss"]
             
 class Stage(Enum):
     """Simple enum to track stage of experiments."""

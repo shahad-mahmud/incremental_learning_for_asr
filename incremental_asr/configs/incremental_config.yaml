@@ -28,11 +28,11 @@ text_file: ../jsons/text_task2.txt
 # Training parameters
 number_of_epochs: 30
 number_of_ctc_epochs: 15
-batch_size: 16
+batch_size: 8
 lr: 1.0
 ctc_weight: 0.5
 sorting: ascending
-ckpt_interval_minutes: 5
+ckpt_interval_minutes: 2
 label_smoothing: 0.1
 
 # Feature parameters
