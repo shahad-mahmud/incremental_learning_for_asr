@@ -45,8 +45,8 @@ def prepare_annotation_files(configs: dict) -> None:
 def create_json(audio_paths: List[str],
                 trans_dict: dict,
                 json_file_path: str,
-                streaming_dataset: bool = False,
-                streaming_duration_limit: int = 10):
+                streaming_dataset: bool = True,
+                streaming_duration_limit: int = 15):
     """Create JSON files for a dataset
 
     Args:

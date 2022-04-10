@@ -12,10 +12,13 @@ audio_extensions:
     - .flac
 
 # incremental parameters
+training_type: ft  # ft, rbkd
+
 teacher_run_num: 0
 teacher_dir: !ref ../results/sb_asr/run_<teacher_run_num>
 
 rbkd_factor: 0.05
+temperature_rbkd: 3.0
 
 # data paths
 tokenizer_model: ../results/tokenizer/run_1/bpe_256.model

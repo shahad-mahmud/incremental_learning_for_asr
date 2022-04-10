@@ -4,11 +4,11 @@ def rbkd(teacher: torch.Tensor, student: torch.Tensor, temperature: float=1.0):
     return rbkd_mat(teacher, student, temperature)
 
 def rbkd_mat(teacher: torch.Tensor, student: torch.Tensor, temperature: float=1.0):   
-    teacher_sl = torch.div((teacher ** (1 / temperature)).permute(2,0,1), (teacher ** (1 / temperature)).sum(dim=2)).permute(1,2,0)
-    student_sl = torch.div((student ** (1 / temperature)).permute(2,0,1), (student ** (1 / temperature)).sum(dim=2)).permute(1,2,0)
+    teacher_sl = torch.div((torch.exp(teacher / temperature)).permute(2,0,1), (torch.exp(teacher / temperature)).sum(dim=2)).permute(1,2,0)
+    student_sl = torch.div((torch.exp(student / temperature)).permute(2,0,1), (torch.exp(student / temperature)).sum(dim=2)).permute(1,2,0)
     
-    loss = -(teacher_sl * torch.log(student_sl)).sum(dim=2).sum(dim=1).mean()
-    return loss
+    loss = -(teacher_sl * torch.log(student_sl)).sum(dim=2).sum(dim=1)
+    return loss.mean()
 
 def rbkd_loop(teacher: torch.Tensor, student: torch.Tensor, temperature: float=1.0):
     batch_size = teacher.shape[0]
