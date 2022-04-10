@@ -42,7 +42,10 @@ class ASR(sb.Brain):
         teacher_state_dicts = torch.load(teacher_model_path)
         self.hparams.model.load_state_dict(teacher_state_dicts)
         
-        self.avg_rbkd_loss = 0
+        self.avg_rbkd_loss = 0.0
+        
+        if self.checkpointer is not None:
+            self.checkpointer.add_recoverable("brain", self)
 
     def compute_forward(self, batch, stage):
         batch = batch.to(self.device)

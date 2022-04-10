@@ -15,6 +15,9 @@ if __name__ == "__main__":
     
     if hparams['run_num'] == hparams['teacher_run_num']:
         raise ValueError("run_num and parent_run_num must be different")
+    
+    if not hparams['skip_data_preparation']:
+        utils.data.prepare_annotation_files(hparams)
         
     sb.create_experiment_directory(
         experiment_directory=hparams["result_dir"],

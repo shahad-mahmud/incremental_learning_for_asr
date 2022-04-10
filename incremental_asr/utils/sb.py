@@ -24,7 +24,7 @@ def dataio_prepare(hparams):
         yield tokens
 
     datasets = {}
-    data_folder = hparams["data_folder"]
+    data_folder = hparams["data_dir"]
     for dataset in ["train", "valid", "test"]:
         datasets[dataset] = sb.dataio.dataset.DynamicItemDataset.from_json(
             json_path=hparams[f"{dataset}_annotation"],

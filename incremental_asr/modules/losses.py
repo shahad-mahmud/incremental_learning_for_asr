@@ -1,6 +1,6 @@
 import torch
 
-def rbkd(teacher, student, temperature: float=1.0):
+def rbkd(teacher: torch.Tensor, student: torch.Tensor, temperature: float=1.0):
     return rbkd_mat(teacher, student, temperature)
 
 def rbkd_mat(teacher: torch.Tensor, student: torch.Tensor, temperature: float=1.0):   
