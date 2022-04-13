@@ -5,10 +5,8 @@ import torch
 import speechbrain as sb
 
 from tqdm import tqdm
-from enum import Enum, auto
 from torch.utils.data import DataLoader
 
-from speechbrain.pretrained import Pretrained, fetching
 from speechbrain.utils.distributed import run_on_main
 from speechbrain.dataio.dataloader import LoopedLoader
 
@@ -27,6 +25,8 @@ class ASR(sb.Brain):
         teacher_dir=None,
     ):
         self.avg_rbkd_loss = 0.0
+        self.avg_ebkd_loss = 0.0
+
         super().__init__(
             modules=modules,
             opt_class=opt_class,
@@ -65,8 +65,9 @@ class ASR(sb.Brain):
         logits = self.modules.seq_lin(decoder_outs)
         predictions = {"student_log_probs": self.hparams.log_softmax(logits)}
         if self.hparams.training_type != 'ft':
-            predictions['teacher_log_probs'] = self.teacher.compute_probs(
-                features, self.feature_lengths, tokens_bos)
+            predictions[
+                'teacher_log_probs'], teacher_enc = self.teacher.compute_probs(
+                    features, self.feature_lengths, tokens_bos)
 
         if self.is_ctc_active(stage):
             ctc_logits = self.modules.ctc_lin(encoder_outs)
@@ -77,6 +78,11 @@ class ASR(sb.Brain):
         elif stage == sb.Stage.TEST:
             predictions["tokens"], _ = self.hparams.valid_search(
                 encoder_outs, self.feature_lengths)
+
+        if self.hparams.training_type in ['ebkd', 'st', 'ts']:
+            predictions['student_enc'] = encoder_outs
+            predictions['teacher_enc'] = teacher_enc
+
         return predictions
 
     def compute_objectives(self, predictions, batch, stage):
@@ -97,7 +103,7 @@ class ASR(sb.Brain):
             student_loss *= 1 - self.hparams.ctc_weight
             student_loss += self.hparams.ctc_weight * ctc_loss
 
-        if self.hparams.training_type != 'ft':
+        if self.hparams.training_type == 'rbkd':
             rbkd_loss = losses.rbkd(predictions["teacher_log_probs"],
                                     predictions["student_log_probs"],
                                     self.hparams.temperature_rbkd)
@@ -106,6 +112,40 @@ class ASR(sb.Brain):
 
             self.avg_rbkd_loss = self.update_average(rbkd_loss.detach().cpu(),
                                                      self.avg_rbkd_loss)
+        elif self.hparams.training_type == 'ebkd':
+            teacher_loss = sb.nnet.losses.nll_loss(
+                log_probabilities=predictions["teacher_log_probs"],
+                targets=tokens_eos,
+                length=tokens_eos_lens,
+                label_smoothing=self.hparams.label_smoothing,
+            )
+
+            ebkd_loss = losses.ebkd(teacher_loss.clone(), student_loss.clone(),
+                                    predictions['teacher_enc'],
+                                    predictions['student_enc'],
+                                    self.hparams.temperature_ebkd)
+            loss = (1 - self.hparams.ebkd_factor
+                    ) * student_loss + self.hparams.ebkd_factor * ebkd_loss
+
+            self.avg_ebkd_loss = self.update_average(ebkd_loss.detach().cpu(),
+                                                     self.avg_ebkd_loss)
+        elif self.hparams.training_type in ['st', 'ts']:
+            teacher_loss = sb.nnet.losses.nll_loss(
+                log_probabilities=predictions["teacher_log_probs"],
+                targets=tokens_eos,
+                length=tokens_eos_lens,
+                label_smoothing=self.hparams.label_smoothing,
+            )
+
+            ebkd_loss = losses.ebkd(teacher_loss.clone(), student_loss.clone(),
+                                    predictions['teacher_enc'],
+                                    predictions['student_enc'],
+                                    self.hparams.temperature_ebkd)
+            rbkd_loss = losses.rbkd(predictions["teacher_log_probs"],
+                                    predictions["student_log_probs"],
+                                    self.hparams.temperature_rbkd)
+            
+            loss = student_loss + self.hparams.ebkd_factor * ebkd_loss + self.hparams.rbkd_factor * rbkd_loss
         else:
             loss = student_loss
 
@@ -249,9 +289,16 @@ class ASR(sb.Brain):
                     loss = self.fit_batch(batch)
                     self.avg_train_loss = self.update_average(
                         loss, self.avg_train_loss)
-                    if self.hparams.training_type != 'ft':
+                    if self.hparams.training_type == 'rbkd':
                         t.set_postfix(train_loss=self.avg_train_loss,
                                       rbkd_loss=self.avg_rbkd_loss)
+                    elif self.hparams.training_type == 'ebkd':
+                        t.set_postfix(train_loss=self.avg_train_loss,
+                                      ebkd_loss=self.avg_ebkd_loss)
+                    elif self.hparams.training_type in ['st', 'ts']:
+                        t.set_postfix(train_loss=self.avg_train_loss,
+                                      rbkd_loss=self.avg_rbkd_loss,
+                                      ebkd_loss=self.avg_ebkd_loss)
                     else:
                         t.set_postfix(train_loss=self.avg_train_loss)
 

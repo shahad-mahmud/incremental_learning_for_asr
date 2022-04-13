@@ -1,5 +1,6 @@
 import os
 import torch
+import speechbrain as sb
 from hyperpyyaml import load_hyperpyyaml
 
 from speechbrain.pretrained import Pretrained, fetching
@@ -13,19 +14,18 @@ class Teacher(Pretrained):
     ]
 
     def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+        super().__init__(*args, freeze_params=False, **kwargs)
 
     def compute_probs(self, features, feature_lengths, tokens):
-        with torch.no_grad():
-            encoder_out = self.modules.encoder(features.detach())
+        encoder_out = self.modules.encoder(features.detach())
 
-            embeddings = self.modules.embedding(tokens)
-            decoder_outs, _ = self.modules.decoder(embeddings, encoder_out,
-                                                   feature_lengths)
+        embeddings = self.modules.embedding(tokens)
+        decoder_outs, _ = self.modules.decoder(embeddings, encoder_out,
+                                                feature_lengths)
 
-            logits = self.modules.seq_lin(decoder_outs)
+        logits = self.modules.seq_lin(decoder_outs)
 
-        return self.hparams.log_softmax(logits)
+        return self.hparams.log_softmax(logits), encoder_out
 
     @classmethod
     def from_hparams(
