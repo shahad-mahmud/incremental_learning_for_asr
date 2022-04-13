@@ -146,6 +146,10 @@ class ASR(sb.Brain):
                                     self.hparams.temperature_rbkd)
             
             loss = student_loss + self.hparams.ebkd_factor * ebkd_loss + self.hparams.rbkd_factor * rbkd_loss
+            self.avg_ebkd_loss = self.update_average(ebkd_loss.detach().cpu(),
+                                                     self.avg_ebkd_loss)
+            self.avg_rbkd_loss = self.update_average(rbkd_loss.detach().cpu(),
+                                                     self.avg_rbkd_loss)
         else:
             loss = student_loss
 

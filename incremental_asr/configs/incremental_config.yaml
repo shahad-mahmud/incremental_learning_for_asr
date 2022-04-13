@@ -17,8 +17,8 @@ training_type: ft  # ft, rbkd
 teacher_run_num: 0
 teacher_dir: !ref ../results/sb_asr/run_<teacher_run_num>
 
-rbkd_factor: 0.05
-ebkd_factor: 0.05
+rbkd_factor: 0.03
+ebkd_factor: 0.8
 temperature_rbkd: 3.0
 temperature_ebkd: 3.0
 
