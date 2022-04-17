@@ -137,19 +137,23 @@ class ASR(sb.Brain):
                 label_smoothing=self.hparams.label_smoothing,
             )
 
-            ebkd_loss = losses.ebkd(teacher_loss.clone(), student_loss.clone(),
-                                    predictions['teacher_enc'],
-                                    predictions['student_enc'],
-                                    self.hparams.temperature_ebkd)
             rbkd_loss = losses.rbkd(predictions["teacher_log_probs"],
                                     predictions["student_log_probs"],
                                     self.hparams.temperature_rbkd)
-            
-            loss = student_loss + self.hparams.ebkd_factor * ebkd_loss + self.hparams.rbkd_factor * rbkd_loss
-            self.avg_ebkd_loss = self.update_average(ebkd_loss.detach().cpu(),
-                                                     self.avg_ebkd_loss)
-            self.avg_rbkd_loss = self.update_average(rbkd_loss.detach().cpu(),
-                                                     self.avg_rbkd_loss)
+
+            if sb.Stage.TRAIN == stage:
+                ebkd_loss = losses.ebkd(teacher_loss.clone(),
+                                        student_loss.clone(),
+                                        predictions['teacher_enc'],
+                                        predictions['student_enc'],
+                                        self.hparams.temperature_ebkd)
+                loss = student_loss + self.hparams.ebkd_factor * ebkd_loss + self.hparams.rbkd_factor * rbkd_loss
+                self.avg_ebkd_loss = self.update_average(
+                    ebkd_loss.detach().cpu(), self.avg_ebkd_loss)
+                self.avg_rbkd_loss = self.update_average(
+                    rbkd_loss.detach().cpu(), self.avg_rbkd_loss)
+            else:
+                loss = student_loss + self.hparams.rbkd_factor * rbkd_loss
         else:
             loss = student_loss
 
@@ -357,6 +361,7 @@ class ASR(sb.Brain):
             "step": self.step,
             "avg_train_loss": self.avg_train_loss,
             "avg_rbkd_loss": self.avg_rbkd_loss,
+            "avg_ebkd_loss": self.avg_ebkd_loss,
         }
         with open(path, "w") as w:
             w.write(yaml.dump(save_dict))
@@ -370,3 +375,4 @@ class ASR(sb.Brain):
         self.step = save_dict["step"]
         self.avg_train_loss = save_dict["avg_train_loss"]
         self.avg_rbkd_loss = save_dict["avg_rbkd_loss"]
+        self.avg_ebkd_loss = save_dict["avg_ebkd_loss"]
