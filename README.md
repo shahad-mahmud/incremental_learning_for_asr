@@ -1,7 +1,15 @@
 # Incremental Learning
 Incremental learning is a method of training a model incrementally by adding new data points to the model. While working with continuous new data, the model is trained on the new data point and the model is updated with the new data point so that it retains the performance on old data.
-
+ 
 ## How to use
+### Project structure
+
+├── data  
+├── incremental_asr  
+|   ├── configs  
+│   ├── modules    
+│   └── utils  
+
 ### Setting up the environment
 At first create a virtual environment and set up the environment. 
 ```
@@ -13,3 +21,4 @@ Now give run permission to `setup_env.sh` and run from the terminal. This will i
 chmod +x setup_env.sh
 ./setup_env.sh
 ```
+### Get you data
