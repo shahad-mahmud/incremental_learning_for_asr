@@ -32,7 +32,7 @@ def prepare_annotation_files(configs: dict) -> None:
     audio_file_paths = get_files_with_extensions(configs['data_dir'],
                                                  configs['audio_extensions'])
     transcript_file_path = get_files_with_extensions(configs['data_dir'],
-                                                     '.tsv')
+                                                     ['.tsv'])
 
     transcripts = get_transcription(transcript_file_path)
     train_paths, valid_paths, test_paths = get_sets(audio_file_paths)
@@ -45,8 +45,8 @@ def prepare_annotation_files(configs: dict) -> None:
 def create_json(audio_paths: List[str],
                 trans_dict: dict,
                 json_file_path: str,
-                streaming_dataset: bool = False,
-                streaming_duration_limit: int = 10):
+                streaming_dataset: bool = True,
+                streaming_duration_limit: int = 15):
     """Create JSON files for a dataset
 
     Args:
@@ -100,7 +100,7 @@ def prepare_text_file(configs: dict) -> None:
         return
 
     transcript_file_path = get_files_with_extensions(configs['data_dir'],
-                                                     '.tsv')
+                                                     ['.tsv'])
     transcripts = get_transcription(transcript_file_path)
 
     create_text_file(configs, transcripts)

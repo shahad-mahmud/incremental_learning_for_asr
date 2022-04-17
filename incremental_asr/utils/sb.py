@@ -13,7 +13,6 @@ def dataio_prepare(hparams):
         "words", "tokens_list", "tokens_bos", "tokens_eos", "tokens"
     )
     def text_pipeline(words):
-        """Processes the transcriptions to generate proper labels"""
         yield words
         tokens_list = hparams['tokenizer'].encode_as_ids(words)
         yield tokens_list
@@ -25,7 +24,7 @@ def dataio_prepare(hparams):
         yield tokens
 
     datasets = {}
-    data_folder = hparams["data_folder"]
+    data_folder = hparams["data_dir"]
     for dataset in ["train", "valid", "test"]:
         datasets[dataset] = sb.dataio.dataset.DynamicItemDataset.from_json(
             json_path=hparams[f"{dataset}_annotation"],

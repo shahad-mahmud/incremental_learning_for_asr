@@ -2,6 +2,7 @@
 data
 jsons
 results
+outs
 
 __pycache__
 .vscode

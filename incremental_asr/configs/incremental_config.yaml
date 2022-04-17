@@ -1,26 +1,43 @@
 # basic configs
 run_num: 100
-data_folder: ../data
+data_dir: ../data/task_2/stt_data
 result_dir: !ref ../results/sb_asr/run_<run_num>
-wer_file: !ref <result_dir>/wer.txt
+wer_file: !ref <result_dir>/wer_original.txt
 save_folder: !ref <result_dir>/save
 train_log: !ref <result_dir>/train_log.txt
+
+skip_data_preparation: False
+audio_extensions:
+    - .wav
+    - .flac
+
+# incremental parameters
+training_type: ft  # ft, rbkd
+
+teacher_run_num: 0
+teacher_dir: !ref ../results/sb_asr/run_<teacher_run_num>
+
+rbkd_factor: 0.03
+ebkd_factor: 0.8
+temperature_rbkd: 3.0
+temperature_ebkd: 3.0
 
 # data paths
 tokenizer_model: ../results/tokenizer/run_1/bpe_256.model
 
-train_annotation: ../jsons/train.json
-valid_annotation: ../jsons/valid.json
+train_annotation: ../jsons/train_task2.json
+valid_annotation: ../jsons/valid_task2.json
 test_annotation: ../jsons/test.json
+text_file: ../jsons/text_task2.txt
 
 # Training parameters
 number_of_epochs: 30
 number_of_ctc_epochs: 15
-batch_size: 16
+batch_size: 8
 lr: 1.0
 ctc_weight: 0.5
 sorting: ascending
-ckpt_interval_minutes: 5
+ckpt_interval_minutes: 2
 label_smoothing: 0.1
 
 # Feature parameters
